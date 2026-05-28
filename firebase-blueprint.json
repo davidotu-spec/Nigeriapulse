@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "Survey": {
+      "title": "Survey",
+      "description": "A weekly survey question",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "options": { "type": "array" },
+        "activeFrom": { "type": "string", "format": "date-time" },
+        "activeTo": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "totalVotes": { "type": "integer" },
+        "results": { "type": "object" },
+        "weekLabel": { "type": "string" },
+        "translations": {
+          "type": "object",
+          "properties": {
+            "pidgin": { "type": "string" },
+            "hausa": { "type": "string" },
+            "yoruba": { "type": "string" },
+            "igbo": { "type": "string" }
+          }
+        }
+      },
+      "required": ["question", "options", "activeFrom", "activeTo", "status"]
+    },
+    "Vote": {
+      "title": "Vote",
+      "description": "An anonymous response to a survey",
+      "type": "object",
+      "properties": {
+        "surveyId": { "type": "string" },
+        "optionIndex": { "type": "integer" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string" },
+        "userId": { "type": "string" },
+        "comment": { "type": "string" },
+        "demographics": { "type": "object" }
+      },
+      "required": ["surveyId", "optionIndex", "timestamp", "deviceId"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Authenticated user data and rewards",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "points": { "type": "integer" },
+        "streak": { "type": "integer" },
+        "lastActive": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Rating": {
+      "title": "Rating",
+      "description": "User feedback and rating",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "surveyId": { "type": "string" },
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "comment": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["rating", "timestamp"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "System administrator with elevated privileges",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "CommentReply": {
+      "title": "Comment Reply",
+      "description": "A reply to an existing comment",
+      "type": "object",
+      "properties": {
+        "comment": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" },
+        "authorEmail": { "type": "string" }
+      },
+      "required": ["comment", "timestamp"]
+    },
+    "ApiKey": {
+      "title": "API Key",
+      "description": "API key for external access to aggregated data",
+      "type": "object",
+      "properties": {
+        "ownerEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "revoked"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerEmail", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/api_keys/{key}": {
+      "schema": "ApiKey",
+      "description": "Collection of active API keys"
+    },
+    "/surveys/{surveyId}": {
+      "schema": "Survey",
+      "description": "Collection of weekly surveys"
+    },
+    "/surveys/{surveyId}/votes/{voteId}": {
+      "schema": "Vote",
+      "description": "Subcollection of votes. voteId is deviceId or userId."
+    },
+    "/surveys/{surveyId}/comments/{commentId}": {
+      "schema": "object",
+      "description": "Anonymous public comments for a survey"
+    },
+    "/surveys/{surveyId}/comments/{commentId}/replies/{replyId}": {
+      "schema": "CommentReply",
+      "description": "Subcollection of replies to a comment"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles for authenticated participants"
+    },
+    "/ratings/{ratingId}": {
+      "schema": "Rating",
+      "description": "Collection of user feedback and ratings"
+    },
+    "/admins/{userId}": {
+      "schema": "Admin",
+      "description": "Collection of authorized administrators"
+    }
+  }
+}

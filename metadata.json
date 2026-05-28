@@ -1,0 +1,8 @@
+{
+  "name": "Nigeria Pulse",
+  "description": "Weekly micro-survey engine for capturing the national pulse with authenticated profiles, rewards, and a public research API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

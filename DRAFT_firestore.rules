@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Survey Validation
+    function isValidSurvey(data) {
+      return data.question is string && data.question.size() > 0 && data.question.size() <= 500 &&
+             data.options is list && data.options.size() >= 2 && data.options.size() <= 10 &&
+             data.status in ['planned', 'active', 'archived'] &&
+             data.activeFrom is timestamp && data.activeTo is timestamp &&
+             (!('translations' in data) || (
+               data.translations is map &&
+               (!('pidgin' in data.translations) || data.translations.pidgin is string) &&
+               (!('hausa' in data.translations) || data.translations.hausa is string) &&
+               (!('yoruba' in data.translations) || data.translations.yoruba is string) &&
+               (!('igbo' in data.translations) || data.translations.igbo is string)
+             ));
+    }
+
+    // Vote Validation
+    function isValidVote(data, surveyId) {
+      return data.surveyId == surveyId &&
+             data.optionIndex is int && data.optionIndex >= 0 &&
+             data.timestamp == request.time &&
+             data.deviceId is string && data.deviceId.size() <= 128;
+    }
+
+    match /surveys/{surveyId} {
+      allow read: if true; // Everyone can see surveys
+      allow create, update: if isAdmin() && isValidSurvey(incoming());
+      allow delete: if isAdmin();
+      
+      match /votes/{deviceId} {
+        // Vote must be created with the Survey it belongs to, and only if Survey is active
+        allow create: if isValidId(surveyId) && isValidId(deviceId) &&
+                        get(/databases/$(database)/documents/surveys/$(surveyId)).data.status == 'active' &&
+                        isValidVote(incoming(), surveyId) &&
+                        incoming().deviceId == deviceId;
+        
+        // Users can't see each other's votes
+        allow read: if isSignedIn() && request.auth.uid == deviceId; // Only if deviceId matches UID (if we use auth)
+        // Or if anonymous, we just don't allow listing
+      }
+    }
+
+    match /admins/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false; // Only manageable through console or initial bootstrap
+    }
+
+    match /api_keys/{key} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "short_name": "NGR Pulse",
+  "name": "Nigeria Pulse: Real-time Public Opinion Insights",
+  "description": "Together we build the Nigeria we want through real-time voting, surveys, and analysis.",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%23008751'/%3E%3Ccircle cx='84' cy='84' r='42' stroke='white' stroke-width='18' fill='none'/%3E%3Cpath d='M120 120L168 168' stroke='white' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M96 66L78 93H93L84 114' stroke='%23FCD116' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23008751'/%3E%3Ccircle cx='224' cy='224' r='112' stroke='white' stroke-width='48' fill='none'/%3E%3Cpath d='M320 320L448 448' stroke='white' stroke-width='48' stroke-linecap='round'/%3E%3Cpath d='M256 176L208 248H248L224 304' stroke='%23FCD116' stroke-width='24' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#008751",
+  "theme_color": "#008751",
+  "display": "standalone",
+  "orientation": "portrait"
+}

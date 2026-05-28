@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -- Helpers --
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { 
+      // In production, this would check an admins collection
+      // For this MVP environment, we can bootstrap by checking for a specific email or role
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); 
+    }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // -- Survey Logic --
+    function isValidSurvey(data) {
+      return data.question is string && data.question.size() > 0 && data.question.size() <= 500 &&
+             data.options is list && data.options.size() >= 2 && data.options.size() <= 10 &&
+             data.status in ['planned', 'active', 'archived'] &&
+             data.activeFrom is timestamp && data.activeTo is timestamp &&
+             data.totalVotes is int && data.totalVotes >= 0 &&
+             (!('translations' in data) || (
+               data.translations is map &&
+               (!('pidgin' in data.translations) || data.translations.pidgin is string) &&
+               (!('hausa' in data.translations) || data.translations.hausa is string) &&
+               (!('yoruba' in data.translations) || data.translations.yoruba is string) &&
+               (!('igbo' in data.translations) || data.translations.igbo is string)
+             ));
+    }
+
+    // Vote Validation
+    function isValidVote(data, surveyId) {
+      return data.surveyId == surveyId &&
+             data.optionIndex is int && data.optionIndex >= 0 &&
+             data.timestamp == request.time &&
+             data.deviceId is string && data.deviceId.size() <= 128 &&
+             (!('comment' in data) || (data.comment is string && data.comment.size() <= 500)) &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128)) &&
+             (!('demographics' in data) || (
+               data.demographics is map &&
+               (!('state' in data.demographics) || (data.demographics.state is string)) &&
+               (!('ageRange' in data.demographics) || (data.demographics.ageRange is string)) &&
+               (!('gender' in data.demographics) || (data.demographics.gender is string))
+             ));
+    }
+
+    // User Profile Validation
+    function isValidProfile(data) {
+      return data.points is int && data.points >= 0 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
+             (!('streak' in data) || (data.streak is int)) &&
+             (!('lastActive' in data) || (data.lastActive is timestamp));
+    }
+
+    // Rating Validation
+    function isValidRating(data) {
+      return (data.rating is int || data.rating is number) && data.rating >= 1 && data.rating <= 5 &&
+             data.timestamp is timestamp &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128)) &&
+             (!('surveyId' in data) || (data.surveyId is string && data.surveyId.size() <= 128)) &&
+             (!('comment' in data) || (data.comment is string && data.comment.size() <= 500));
+    }
+
+    match /surveys/{surveyId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidSurvey(incoming());
+      allow delete: if isAdmin();
+      
+      allow update: if (isAdmin() && isValidSurvey(incoming())) || (
+        incoming().diff(existing()).affectedKeys().hasOnly(['totalVotes', 'results', 'demographics', 'updatedAt']) &&
+        incoming().totalVotes == existing().totalVotes + 1 &&
+        get(/databases/$(database)/documents/surveys/$(surveyId)).data.status == 'active'
+      );
+
+      match /votes/{voteId} {
+        allow create: if isValidId(surveyId) && isValidId(voteId) &&
+                        get(/databases/$(database)/documents/surveys/$(surveyId)).data.status == 'active' &&
+                        isValidVote(incoming(), surveyId) &&
+                        (incoming().deviceId == voteId || (isSignedIn() && request.auth.uid == voteId)) &&
+                        getAfter(/databases/$(database)/documents/surveys/$(surveyId)).data.totalVotes == 
+                        get(/databases/$(database)/documents/surveys/$(surveyId)).data.totalVotes + 1;
+        
+        allow get: if isSignedIn() && request.auth.uid == voteId;
+        allow list: if true; // Public activity feed
+      }
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if get(/databases/$(database)/documents/surveys/$(surveyId)).data.status == 'active' &&
+                        incoming().timestamp == request.time &&
+                        incoming().comment is string && incoming().comment.size() <= 500 &&
+                        // Optional: Link to a vote that was created/existing
+                        true; 
+
+        match /replies/{replyId} {
+          allow read: if true;
+          allow create: if get(/databases/$(database)/documents/surveys/$(surveyId)).data.status == 'active' &&
+                          incoming().timestamp == request.time &&
+                          incoming().comment is string && incoming().comment.size() <= 1000 &&
+                          (!('authorEmail' in incoming()) || (incoming().authorEmail is string && incoming().authorEmail.size() <= 200)) &&
+                          (!('authorId' in incoming()) || (incoming().authorId is string && incoming().authorId.size() <= 128));
+        }
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidProfile(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId && 
+                       incoming().diff(existing()).affectedKeys().hasOnly(['streak', 'lastActive', 'points']) &&
+                       isValidProfile(incoming());
+    }
+
+    match /admins/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.token.email == 'davidotu@mixxd.org' && request.auth.token.email_verified == true;
+    }
+    
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow create: if incoming().rating >= 1 && incoming().rating <= 5;
+    }
+
+    match /api_keys/{key} {
+      allow read, write: if isAdmin();
+    }
+
+    match /fcm_tokens/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+  }
+}
